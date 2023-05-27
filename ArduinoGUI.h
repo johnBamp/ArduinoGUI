@@ -83,12 +83,48 @@ class Button : public Label {
     Adafruit_FT6206* cts;
     uint16_t activeColor;
     uint16_t inactiveColor;
-    bool isPressed;
     int radius;
 
   public:
+    bool wasPressed = false;
+    bool isPressed;
     Button(String text, int row, int column, int rowspan, int colspan, uint16_t backgroundColor, uint16_t textColor, uint8_t textSize, bool centered, Adafruit_ILI9341* tft, Grid* grid, int padx, int pady, int border, uint16_t borderColor, int radius, void (*onClick)(), Adafruit_FT6206* cts, uint16_t activeColor);
     void checkTouch();
 };
+
+class Keyboard {
+  private:
+    Button* keys[5][10];
+    Button* modeKey;
+    Button* deleteKey;
+    Button* spaceKey;
+    Button* enterKey;
+    Adafruit_ILI9341* tft;
+    Grid* grid;
+    Adafruit_FT6206* cts;
+    bool mode;
+    String numericSpecial[5][10] = {{"1", "2", "3", "4", "5", "6", "7", "8", "9", "0"},
+      {"!", "@", "#", "$", "%", "^", "&", "*", "(", ")"},
+      {"_", "+", "{", "}", "|", "~", "<", ">", "?", ":"},
+      {"MODE", " ", "DEL", "ENT"}
+    };
+
+    String qwerty[5][10] = {{"Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P"},
+      {"A", "S", "D", "F", "G", "H", "J", "K", "L", "-"},
+      {"Z", "X", "C", "V", "B", "N", "M", ",", ".", "/"},
+      {"MODE", " ", "DEL", "ENT"}
+    };
+    String input; // Store user input
+
+  public:
+    Keyboard(Adafruit_ILI9341* tft, Grid* grid, Adafruit_FT6206* cts);
+    void draw();
+    void readKeys();
+    void toggleMode();
+    void handleKeyPress(String key); // Function to handle key press events
+    // Other methods can go here...
+};
+
+
 
 #endif
