@@ -187,7 +187,8 @@ void ScrollableLabel::checkTouch() {
       // Count lines in text
       int lineCount = 0;
       for (int i = 0; i < text.length(); i++) {
-        if (text[i] == ' ' || text[i == '\n') {
+        char c = text[i];
+        if (c == ' ' || c == '\n') {
           lineCount++;
         }
       }
@@ -208,6 +209,8 @@ Button::Button(String text, int row, int column, int rowspan, int colspan, uint1
   : Label(text, row, column, rowspan, colspan, backgroundColor, textColor, textSize, centered, tft, grid, padx, pady, border, borderColor, radius),
     onClick(onClick), cts(cts), activeColor(activeColor), inactiveColor(backgroundColor), isPressed(false), radius(radius) {}
 
+bool buttonJustPressed = false;
+
 void Button::checkTouch() {
   if (cts->touched()) {
     TS_Point touchPoint = cts->getPoint();
@@ -223,27 +226,142 @@ void Button::checkTouch() {
     touchPoint.x = map(touchPoint.x, 320, 0, 0, 320);
 
     if (touchPoint.x >= x && touchPoint.x <= x + w && touchPoint.y >= y && touchPoint.y <= y + h) {
-      if (!isPressed) {
-        // Only change the color and call the onClick function if the button was not already pressed
+      if (!isPressed && !buttonJustPressed && !wasPressed) {
         setBackgroundColor(activeColor);
         draw();
         onClick();
         isPressed = true;
+        buttonJustPressed = true;
+        wasPressed = true;
       }
     } else {
       if (isPressed) {
-        // If the touch is outside the button area and the button was previously pressed, change its color back to the inactive color
         setBackgroundColor(inactiveColor);
         draw();
-        isPressed = false;
       }
+      isPressed = false;
+      buttonJustPressed = false;
+      wasPressed = false;
     }
   } else {
     if (isPressed) {
-      // If the button was previously pressed, change its color back to the inactive color when the touch is released
       setBackgroundColor(inactiveColor);
       draw();
-      isPressed = false;
     }
+    isPressed = false;
+    buttonJustPressed = false;
+    wasPressed = false;
+  }
+}
+
+void placeholder() {
+
+}
+
+
+void Keyboard::toggleMode() {
+  // Toggle mode between alphanumeric and numeric/special
+  mode = !mode;
+
+  // Update buttons
+  for (int i = 0; i < 3; i++) {
+    for (int j = 0; j < 10; j++) {
+      keys[i][j]->setText(mode ? numericSpecial[i][j] : qwerty[i][j]);
+      keys[i][j]->draw(); // Update the displayed button
+    }
+  }
+  // Redraw the mode button to reflect the current mode
+  modeKey->setText(mode ? "ALPHA" : "MODE");
+  modeKey->draw();
+}
+
+Keyboard::Keyboard(Adafruit_ILI9341* tft, Grid* grid, Adafruit_FT6206* cts)
+  : tft(tft), grid(grid), cts(cts) {
+
+  input = "";
+  // Initialize QWERTY keys
+  for (int i = 0; i < 3; i++) {
+    for (int j = 0; j < 10; j++) {
+      keys[i][j] = new Button(qwerty[i][j], i + 1, j, 1, 1, ILI9341_WHITE, ILI9341_BLACK, 2, true, tft, grid, 2, 2, 1, ILI9341_BLACK, 0, &placeholder, cts, ILI9341_BLUE);
+    }
+  }
+
+  // Initialize bottom row keys
+  modeKey = new Button(qwerty[3][0], 4, 0, 1, 2, ILI9341_WHITE, ILI9341_BLACK, 2, true, tft, grid, 2, 2, 1, ILI9341_BLACK, 0, &placeholder, cts, ILI9341_BLUE);
+  spaceKey = new Button(qwerty[3][1], 4, 2, 1, 4, ILI9341_WHITE, ILI9341_BLACK, 2, true, tft, grid, 2, 2, 1, ILI9341_BLACK, 0, &placeholder, cts, ILI9341_BLUE);
+  deleteKey = new Button(qwerty[3][2], 4, 6, 1, 2, ILI9341_WHITE, ILI9341_BLACK, 2, true, tft, grid, 2, 2, 1, ILI9341_BLACK, 0, &placeholder, cts, ILI9341_BLUE);
+  enterKey = new Button(qwerty[3][3], 4, 8, 1, 2, ILI9341_WHITE, ILI9341_BLACK, 2, true, tft, grid, 2, 2, 1, ILI9341_BLACK, 0, &placeholder, cts, ILI9341_BLUE);
+}
+
+void Keyboard::draw() {
+  // Draw QWERTY keys
+  for (int i = 0; i < 3; i++) {
+    for (int j = 0; j < 10; j++) {
+      keys[i][j]->draw();
+    }
+  }
+
+  // Draw bottom row keys
+  modeKey->draw();
+  spaceKey->draw();
+  deleteKey->draw();
+  enterKey->draw();
+}
+
+bool wasPressed[3][10] = {false};
+bool wasModeKeyPressed = false;
+bool wasSpaceKeyPressed = false;
+bool wasDeleteKeyPressed = false;
+bool wasEnterKeyPressed = false;
+
+void Keyboard::readKeys() {
+  for (int i = 0; i < 3; i++) {
+    for (int j = 0; j < 10; j++) {
+      keys[i][j]->checkTouch();
+
+      if (keys[i][j]->isPressed && !wasPressed[i][j]) {
+        String text = keys[i][j]->getText();
+        input += text;
+        Serial.println(input);
+        wasPressed[i][j] = true;
+      } else if (!keys[i][j]->isPressed) {
+        wasPressed[i][j] = false;
+      }
+    }
+  }
+
+  modeKey->checkTouch();
+  if (modeKey->isPressed && !wasModeKeyPressed) {
+    toggleMode();
+    wasModeKeyPressed = true;
+  } else if (!modeKey->isPressed) {
+    wasModeKeyPressed = false;
+  }
+
+  spaceKey->checkTouch();
+  if (spaceKey->isPressed && !wasSpaceKeyPressed) {
+    input += " ";
+    wasSpaceKeyPressed = true;
+  } else if (!spaceKey->isPressed) {
+    wasSpaceKeyPressed = false;
+  }
+
+  deleteKey->checkTouch();
+  if (deleteKey->isPressed && !wasDeleteKeyPressed) {
+    if (input.length() > 0) {
+      input = input.substring(0, input.length() - 1);
+      Serial.println(input);
+      wasDeleteKeyPressed = true;
+    }
+  } else if (!deleteKey->isPressed) {
+    wasDeleteKeyPressed = false;
+  }
+
+  enterKey->checkTouch();
+  if (enterKey->isPressed && !wasEnterKeyPressed) {
+    // Do something when Enter is pressed
+    wasEnterKeyPressed = true;
+  } else if (!enterKey->isPressed) {
+    wasEnterKeyPressed = false;
   }
 }
