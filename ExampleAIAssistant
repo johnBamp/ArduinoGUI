@@ -6,11 +6,21 @@
 #include <WiFi.h>
 #include "time.h"
 #include "arduinoGUI.h"
+#include <WiFiClientSecure.h>
+#include <ArduinoJson.h>
+#include <ChatGPT.hpp>
 
 #define TFT_CHIP_SLCT 14
 #define TFT_DATA_CMD 32
 
 #define baud_rate 9600
+
+static const char *ssid = "SSID";
+static const char *password = "PASSWORD";
+
+
+WiFiClientSecure client;
+ChatGPT<WiFiClientSecure> chat_gpt(&client, "v1", "API-KEY");
 
 Adafruit_FT6206 ts = Adafruit_FT6206();
 Adafruit_ILI9341 tft = Adafruit_ILI9341(TFT_CHIP_SLCT, TFT_DATA_CMD);
@@ -56,6 +66,17 @@ void setup() {
   keys.draw();
   gptInterface.draw();
 
+  WiFi.begin(ssid, password);
+
+  while (WiFi.status() != WL_CONNECTED) {
+    Serial.println("Connecting...");
+    delay(500);
+  }
+  Serial.println("Connected!");
+
+  // Ignore SSL certificate validation
+  client.setInsecure();
+
 }
 
 String oldInput;
@@ -64,9 +85,20 @@ void loop() {
   keys.readKeys();
   if(oldInput != keys.input){
     gptInterface.setText(keys.input);
-    gptInterface.draw();
   }
   gptInterface.checkTouch();
 
   oldInput = keys.input;
+
+  if(keys.enterClicked()){
+    String result;
+    if (chat_gpt.simple_message("gpt-3.5-turbo-0301", "user", keys.input, result)) {
+      Serial.println("===OK===");
+      Serial.println(result);
+      gptInterface.setText(result);
+    } else {
+      Serial.println("===ERROR===");
+      Serial.println(result);
+    }
+  }
 }
