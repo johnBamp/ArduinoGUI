@@ -1,3 +1,5 @@
+
+```cpp
 #include "arduinoGUI.h"
 
 Grid::Grid(int rows, int columns, Adafruit_ILI9341* tft): rows(rows), columns(columns), tft(tft) {}
@@ -49,36 +51,55 @@ void Label::draw() {
   // Calculate the maximum lines that can fit in the box
   int maxLines = h / (8 * textSize);
 
-  // Simple text wrapping and line counting
   String line = "";
   String word = "";
   int lineCount = 0;
-  for (int i = 0; i < text.length() && lineCount < maxLines + topLine; i++) {
-    char c = text[i];
-    if (c == ' ' || c == '\n' || i == text.length() - 1) {
-      if (i == text.length() - 1 && c != ' ' && c != '\n') {
+
+  Serial.print(text);
+  Serial.print(" ");
+  Serial.print(text.length());
+  Serial.print(" ");
+
+  // Simple text wrapping and line counting
+  if(text.length() == 1){
+    tft->setCursor(x, y);
+    Serial.print(x);
+    Serial.print(",");
+    Serial.println(y);
+    tft->println(text);
+  }else{
+    for (int i = 0; i < text.length() && lineCount < maxLines + topLine; i++) {
+      char c = text[i];
+      if (c == ' ' || c == '\n' || i == text.length() - 1) {
+        if (i == text.length() - 1 && c != ' ' && c != '\n') {
+          word += c;
+        }
+        if (line.length() + word.length() <= maxCharsPerLine) {
+          line += word;
+          if (c == ' ') {
+            line += " ";
+          }
+        } else {
+          if (lineCount >= topLine) {
+            int newX = centered ? x + (w - line.length() * 6 * textSize) / 2 : x;
+            tft->setCursor(newX, y);
+            Serial.print(newX);
+            Serial.print(",");
+            Serial.println(y);
+            tft->println(line);
+            y += 8 * textSize;
+          }
+          line = word + " ";
+          lineCount++;
+        }
+        word = "";
+      } else {
         word += c;
       }
-      if (line.length() + word.length() <= maxCharsPerLine) {
-        line += word;
-        if (c == ' ') {
-          line += " ";
-        }
-      } else {
-        if (lineCount >= topLine) {
-          int newX = centered ? x + (w - line.length() * 6 * textSize) / 2 : x;
-          tft->setCursor(newX, y);
-          tft->println(line);
-          y += 8 * textSize;
-        }
-        line = word + " ";
-        lineCount++;
-      }
-      word = "";
-    } else {
-      word += c;
     }
   }
+  
+  
 
   // Print the last line if it's not empty and doesn't exceed maxLines
   if (line.length() > 0 && lineCount >= topLine && lineCount < maxLines + topLine) {
@@ -110,6 +131,7 @@ int Label::getTopLine() {
 
 void Label::setText(String t) {
   text = t;
+  draw();
 }
 
 String Label::getText() {
@@ -175,7 +197,7 @@ void ScrollableLabel::checkTouch() {
     touchPoint.x = touchPoint.y;
     touchPoint.y = swap;
 
-    touchPoint.x = map(touchPoint.x, 320, 0, 0, 320);
+    touchPoint.y = map(touchPoint.y, 240, 0, 0, 240);
 
     if (touchPoint.x >= x && touchPoint.x <= x + w && touchPoint.y >= y && touchPoint.y <= y + h) {
       // Estimate max characters per line
@@ -193,7 +215,7 @@ void ScrollableLabel::checkTouch() {
         }
       }
 
-      if (touchPoint.y > (y + h / 2) && topLine < lineCount - maxLines - 18) {
+      if (touchPoint.y > (y + h / 2)) {
         topLine++;
         draw();
       }
@@ -223,7 +245,7 @@ void Button::checkTouch() {
     touchPoint.x = touchPoint.y;
     touchPoint.y = swap;
 
-    touchPoint.x = map(touchPoint.x, 320, 0, 0, 320);
+    touchPoint.y = map(touchPoint.y, 240, 0, 0, 240);
 
     if (touchPoint.x >= x && touchPoint.x <= x + w && touchPoint.y >= y && touchPoint.y <= y + h) {
       if (!isPressed && !buttonJustPressed && !wasPressed) {
@@ -282,15 +304,15 @@ Keyboard::Keyboard(Adafruit_ILI9341* tft, Grid* grid, Adafruit_FT6206* cts)
   // Initialize QWERTY keys
   for (int i = 0; i < 3; i++) {
     for (int j = 0; j < 10; j++) {
-      keys[i][j] = new Button(qwerty[i][j], i + 1, j, 1, 1, ILI9341_WHITE, ILI9341_BLACK, 2, true, tft, grid, 2, 2, 1, ILI9341_BLACK, 0, &placeholder, cts, ILI9341_BLUE);
+      keys[i][j] = new Button(qwerty[i][j], i + 1, j, 1, 1, ILI9341_WHITE, ILI9341_BLACK, 2, true, tft, grid, 2, 2, 1, ILI9341_BLACK, 5, &placeholder, cts, ILI9341_BLUE);
     }
   }
 
   // Initialize bottom row keys
-  modeKey = new Button(qwerty[3][0], 4, 0, 1, 2, ILI9341_WHITE, ILI9341_BLACK, 2, true, tft, grid, 2, 2, 1, ILI9341_BLACK, 0, &placeholder, cts, ILI9341_BLUE);
-  spaceKey = new Button(qwerty[3][1], 4, 2, 1, 4, ILI9341_WHITE, ILI9341_BLACK, 2, true, tft, grid, 2, 2, 1, ILI9341_BLACK, 0, &placeholder, cts, ILI9341_BLUE);
-  deleteKey = new Button(qwerty[3][2], 4, 6, 1, 2, ILI9341_WHITE, ILI9341_BLACK, 2, true, tft, grid, 2, 2, 1, ILI9341_BLACK, 0, &placeholder, cts, ILI9341_BLUE);
-  enterKey = new Button(qwerty[3][3], 4, 8, 1, 2, ILI9341_WHITE, ILI9341_BLACK, 2, true, tft, grid, 2, 2, 1, ILI9341_BLACK, 0, &placeholder, cts, ILI9341_BLUE);
+  modeKey = new Button("mode", 4, 0, 1, 2, ILI9341_WHITE, ILI9341_BLACK, 2, true, tft, grid, 2, 2, 1, ILI9341_BLACK, 5, &placeholder, cts, ILI9341_BLUE);
+  spaceKey = new Button(" ", 4, 2, 1, 4, ILI9341_WHITE, ILI9341_BLACK, 2, true, tft, grid, 2, 2, 1, ILI9341_BLACK, 5, &placeholder, cts, ILI9341_BLUE);
+  deleteKey = new Button("Del", 4, 6, 1, 2, ILI9341_WHITE, ILI9341_BLACK, 2, true, tft, grid, 2, 2, 1, ILI9341_BLACK, 5, &placeholder, cts, ILI9341_BLUE);
+  enterKey = new Button("Enter", 4, 8, 1, 2, ILI9341_WHITE, ILI9341_BLACK, 2, true, tft, grid, 2, 2, 1, ILI9341_BLACK, 5, &placeholder, cts, ILI9341_BLUE);
 }
 
 void Keyboard::draw() {
@@ -356,12 +378,16 @@ void Keyboard::readKeys() {
   } else if (!deleteKey->isPressed) {
     wasDeleteKeyPressed = false;
   }
+}
 
+bool Keyboard::enterClicked(){
   enterKey->checkTouch();
   if (enterKey->isPressed && !wasEnterKeyPressed) {
-    // Do something when Enter is pressed
     wasEnterKeyPressed = true;
+    return true;
   } else if (!enterKey->isPressed) {
     wasEnterKeyPressed = false;
+    return false;
   }
 }
+```
