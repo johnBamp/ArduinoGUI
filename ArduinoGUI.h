@@ -114,14 +114,15 @@ class Keyboard {
       {"Z", "X", "C", "V", "B", "N", "M", ",", ".", "/"},
       {"MODE", " ", "DEL", "ENT"}
     };
-    String input; // Store user input
 
   public:
     Keyboard(Adafruit_ILI9341* tft, Grid* grid, Adafruit_FT6206* cts);
+    String input; // Store user input
     void draw();
     void readKeys();
     void toggleMode();
     void handleKeyPress(String key); // Function to handle key press events
+    bool enterClicked();
     // Other methods can go here...
 };
 
