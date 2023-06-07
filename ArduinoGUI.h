@@ -45,7 +45,7 @@ class Label {
     uint16_t borderColor;  // Border color
     int radius;  // Radius for rounded corners
     bool hidden;
-    int topLine;
+    int topLine = 0;
 
   public:
     Label(String text, int row, int column, int rowspan, int colspan, uint16_t backgroundColor, uint16_t textColor, uint8_t textSize, bool centered, Adafruit_ILI9341* tft, Grid* grid, int padx, int pady, int border, uint16_t borderColor, int radius);
@@ -103,6 +103,8 @@ class Keyboard {
     Grid* grid;
     Adafruit_FT6206* cts;
     bool mode;
+    int lineSkip;
+    bool upperCase = true;
     String numericSpecial[5][10] = {{"1", "2", "3", "4", "5", "6", "7", "8", "9", "0"},
       {"!", "@", "#", "$", "%", "^", "&", "*", "(", ")"},
       {"_", "+", "{", "}", "|", "~", "<", ">", "?", ":"},
@@ -116,7 +118,7 @@ class Keyboard {
     };
 
   public:
-    Keyboard(Adafruit_ILI9341* tft, Grid* grid, Adafruit_FT6206* cts);
+    Keyboard(int skip, Adafruit_ILI9341* tft, Grid* grid, Adafruit_FT6206* cts);
     String input; // Store user input
     void draw();
     void readKeys();
