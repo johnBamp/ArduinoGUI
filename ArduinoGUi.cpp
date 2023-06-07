@@ -1,5 +1,3 @@
-
-```cpp
 #include "arduinoGUI.h"
 
 Grid::Grid(int rows, int columns, Adafruit_ILI9341* tft): rows(rows), columns(columns), tft(tft) {}
@@ -55,59 +53,101 @@ void Label::draw() {
   String word = "";
   int lineCount = 0;
 
-  Serial.print(text);
-  Serial.print(" ");
-  Serial.print(text.length());
-  Serial.print(" ");
-
   // Simple text wrapping and line counting
-  if(text.length() == 1){
-    tft->setCursor(x, y);
-    Serial.print(x);
-    Serial.print(",");
-    Serial.println(y);
-    tft->println(text);
-  }else{
-    for (int i = 0; i < text.length() && lineCount < maxLines + topLine; i++) {
-      char c = text[i];
-      if (c == ' ' || c == '\n' || i == text.length() - 1) {
-        if (i == text.length() - 1 && c != ' ' && c != '\n') {
-          word += c;
-        }
-        if (line.length() + word.length() <= maxCharsPerLine) {
-          line += word;
-          if (c == ' ') {
-            line += " ";
-          }
-        } else {
-          if (lineCount >= topLine) {
-            int newX = centered ? x + (w - line.length() * 6 * textSize) / 2 : x;
-            tft->setCursor(newX, y);
-            Serial.print(newX);
-            Serial.print(",");
-            Serial.println(y);
-            tft->println(line);
-            y += 8 * textSize;
-          }
-          line = word + " ";
-          lineCount++;
-        }
-        word = "";
-      } else {
+  for (int i = 0; i < text.length() && lineCount < maxLines + topLine; i++) {
+    char c = text[i];
+    if (c == ' ' || c == '\n' || i == text.length() - 1) {
+      if (i == text.length() - 1 && c != ' ' && c != '\n') {
         word += c;
       }
+      if (line.length() + word.length() <= maxCharsPerLine) {
+        line += word;
+        if (c == ' ') {
+          line += " ";
+        }
+      } else {
+        line = word + " ";
+        lineCount++;
+      }
+      word = "";
+    } else {
+      word += c;
     }
   }
-  
-  
+
+  // Add one to lineCount if there is a line that hasn't been counted
+  if (line.length() > 0) {
+    lineCount++;
+  }
+
+  // Adjust the y coordinate to center the text vertically
+  y += max(0, (h - lineCount * 8 * textSize) / 2);
+
+  // Reset the line and word
+  line = "";
+  word = "";
+
+  // Reset lineCount for the drawing loop
+  lineCount = 0;
+
+  Serial.print("Text: ");
+  Serial.print(text);
+
+  // Draw the text centered on x and y axis
+  for (int i = 0; i < text.length() && lineCount < maxLines + topLine; i++) {
+    char c = text[i];
+    if (c == ' ' || c == '\n' || i == text.length() - 1) {
+      if (i == text.length() - 1 && c != ' ' && c != '\n') {
+        word += c;
+      }
+      if (line.length() + word.length() <= maxCharsPerLine) {
+        line += word;
+        if (c == ' ') {
+          line += " ";
+        }
+      } else {
+        if (lineCount >= topLine) {
+          int newX = centered ? x + (w - line.length() * 6 * textSize) / 2 : x;
+          Serial.print(" X: ");
+          Serial.print(newX);
+          Serial.print(" Y: ");
+          Serial.print(y);
+          tft->setCursor(newX, y);
+          tft->println(line);
+          y += 8 * textSize;
+        }
+        line = word + " ";
+        lineCount++;
+      }
+      word = "";
+    } else {
+      word += c;
+    }
+  }
+
+  Serial.print(" Line count: ");
+  Serial.print(lineCount);
+  Serial.print(" Line length: ");
+  Serial.print(line.length());
+  Serial.print(" Top Line: ");
+  Serial.print(topLine);
+  Serial.print(" Max lines: ");
+  Serial.print(maxLines);
 
   // Print the last line if it's not empty and doesn't exceed maxLines
   if (line.length() > 0 && lineCount >= topLine && lineCount < maxLines + topLine) {
     int newX = centered ? x + (w - line.length() * 6 * textSize) / 2 : x;
+    Serial.print(" X: ");
+    Serial.print(newX);
+    Serial.print(" Y: ");
+    Serial.print(y);
     tft->setCursor(newX, y);
     tft->println(line);
   }
+
+  Serial.println();
 }
+
 
 void Label::hide() {
   int x = (tft->width() / grid->getColumns()) * column;
@@ -251,7 +291,7 @@ void Button::checkTouch() {
       if (!isPressed && !buttonJustPressed && !wasPressed) {
         setBackgroundColor(activeColor);
         draw();
-        onClick();
+        //onClick();
         isPressed = true;
         buttonJustPressed = true;
         wasPressed = true;
@@ -297,22 +337,22 @@ void Keyboard::toggleMode() {
   modeKey->draw();
 }
 
-Keyboard::Keyboard(Adafruit_ILI9341* tft, Grid* grid, Adafruit_FT6206* cts)
-  : tft(tft), grid(grid), cts(cts) {
+Keyboard::Keyboard(int skip, Adafruit_ILI9341* tft, Grid* grid, Adafruit_FT6206* cts)
+  : lineSkip(skip), tft(tft), grid(grid), cts(cts) {
 
   input = "";
   // Initialize QWERTY keys
   for (int i = 0; i < 3; i++) {
     for (int j = 0; j < 10; j++) {
-      keys[i][j] = new Button(qwerty[i][j], i + 1, j, 1, 1, ILI9341_WHITE, ILI9341_BLACK, 2, true, tft, grid, 2, 2, 1, ILI9341_BLACK, 5, &placeholder, cts, ILI9341_BLUE);
+      keys[i][j] = new Button(qwerty[i][j], i + 1 + lineSkip, j, 1, 1, ILI9341_WHITE, ILI9341_BLACK, 2, true, tft, grid, 2, 2, 1, ILI9341_BLACK, 5, &placeholder, cts, ILI9341_BLUE);
     }
   }
 
   // Initialize bottom row keys
-  modeKey = new Button("mode", 4, 0, 1, 2, ILI9341_WHITE, ILI9341_BLACK, 2, true, tft, grid, 2, 2, 1, ILI9341_BLACK, 5, &placeholder, cts, ILI9341_BLUE);
-  spaceKey = new Button(" ", 4, 2, 1, 4, ILI9341_WHITE, ILI9341_BLACK, 2, true, tft, grid, 2, 2, 1, ILI9341_BLACK, 5, &placeholder, cts, ILI9341_BLUE);
-  deleteKey = new Button("Del", 4, 6, 1, 2, ILI9341_WHITE, ILI9341_BLACK, 2, true, tft, grid, 2, 2, 1, ILI9341_BLACK, 5, &placeholder, cts, ILI9341_BLUE);
-  enterKey = new Button("Enter", 4, 8, 1, 2, ILI9341_WHITE, ILI9341_BLACK, 2, true, tft, grid, 2, 2, 1, ILI9341_BLACK, 5, &placeholder, cts, ILI9341_BLUE);
+  modeKey = new Button("mode", 4 + lineSkip, 0, 1, 2, ILI9341_WHITE, ILI9341_BLACK, 2, true, tft, grid, 2, 2, 1, ILI9341_BLACK, 5, &placeholder, cts, ILI9341_BLUE);
+  spaceKey = new Button(" ", 4 + lineSkip, 2, 1, 4, ILI9341_WHITE, ILI9341_BLACK, 2, true, tft, grid, 2, 2, 1, ILI9341_BLACK, 5, &placeholder, cts, ILI9341_BLUE);
+  deleteKey = new Button("Del", 4 + lineSkip, 6, 1, 2, ILI9341_WHITE, ILI9341_BLACK, 2, true, tft, grid, 2, 2, 1, ILI9341_BLACK, 5, &placeholder, cts, ILI9341_BLUE);
+  enterKey = new Button("Enter", 4 + lineSkip, 8, 1, 2, ILI9341_WHITE, ILI9341_BLACK, 2, true, tft, grid, 2, 2, 1, ILI9341_BLACK, 5, &placeholder, cts, ILI9341_BLUE);
 }
 
 void Keyboard::draw() {
@@ -341,7 +381,22 @@ void Keyboard::readKeys() {
     for (int j = 0; j < 10; j++) {
       keys[i][j]->checkTouch();
 
-      if (keys[i][j]->isPressed && !wasPressed[i][j]) {
+      if (keys[i][j]->getText() == "/" && keys[i][j]->isPressed && !wasPressed[i][j]) {
+        upperCase = !upperCase;
+        // Redraw the keyboard with the new case.
+        for (int m = 0; m < 3; m++) {
+          for (int n = 0; n < 10; n++) {
+            String keyText = qwerty[m][n];
+            if (upperCase) {
+              keyText.toUpperCase();
+            } else {
+              keyText.toLowerCase();
+            }
+            keys[m][n]->setText(keyText);
+            keys[m][n]->draw(); // Update the displayed button
+          }
+        }
+      } else if (keys[i][j]->isPressed && !wasPressed[i][j]) {
         String text = keys[i][j]->getText();
         input += text;
         Serial.println(input);
@@ -390,4 +445,3 @@ bool Keyboard::enterClicked(){
     return false;
   }
 }
-```
