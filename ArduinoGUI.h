@@ -96,14 +96,14 @@ class Label {
     bool hidden;
     int topLine = 0;
     const GFXfont* customFont;
-    String image = ""; // New member variable to store the image
     void (*functionPtr)(GFXcanvas16*);
     int x = -1; // Default to -1 to indicate they are not set
     int y = -1;
-
+    GFXcanvas16* canvas;
+      
   public:
-    Label(String text, int row, int column, int rowspan, int colspan, uint16_t backgroundColor, uint16_t textColor, uint8_t textSize, bool centered, Adafruit_ILI9341* tft, Grid* grid, int padx, int pady, int border, uint16_t borderColor, int radius, const GFXfont* font = NULL, void (*functionPtr)(GFXcanvas16*) = nullptr)
-        : text(text), row(row), column(column), rowspan(rowspan), colspan(colspan), backgroundColor(backgroundColor), textColor(textColor), textSize(textSize), centered(centered), tft(tft), grid(grid), padx(padx), pady(pady), border(border), borderColor(borderColor), radius(radius), customFont(font), functionPtr(functionPtr) {}
+      Label(String text, int row, int column, int rowspan, int colspan, uint16_t backgroundColor, uint16_t textColor, uint8_t textSize, bool centered, Adafruit_ILI9341* tft, Grid* grid, int padx, int pady, int border, uint16_t borderColor, int radius, const GFXfont* font = NULL, void (*functionPtr)(GFXcanvas16*) = nullptr)
+          : text(text), row(row), column(column), rowspan(rowspan), colspan(colspan), backgroundColor(backgroundColor), textColor(textColor), textSize(textSize), centered(centered), tft(tft), grid(grid), padx(padx), pady(pady), border(border), borderColor(borderColor), radius(radius), customFont(font), functionPtr(functionPtr) {}
 
     void draw() {
         hidden = false;
@@ -267,6 +267,69 @@ class Label {
 
 };
 
+class Button : public Label {
+  private:
+    void (*onClick)();
+    Adafruit_FT6206* cts;
+    uint16_t activeColor;
+    uint16_t inactiveColor;
+
+  public:
+    bool wasPressed = false;
+    bool isPressed;
+    bool buttonJustPressed = false;
+
+    static void placeholder() {}
+
+    Button(String text, int row, int column, int rowspan, int colspan, uint16_t backgroundColor, uint16_t textColor, uint8_t textSize, bool centered, Adafruit_ILI9341* tft, Grid* grid, int padx, int pady, int border, uint16_t borderColor, int radius, void (*onClick)(), Adafruit_FT6206* cts, uint16_t activeColor, const GFXfont* font = NULL, void (*functionPtr)(GFXcanvas16*) = nullptr)
+      : Label(text, row, column, rowspan, colspan, backgroundColor, textColor, textSize, centered, tft, grid, padx, pady, border, borderColor, radius, font, functionPtr), onClick(onClick), cts(cts), activeColor(activeColor), inactiveColor(backgroundColor), isPressed(false) {}
+
+    void checkTouch() {
+      if (cts->touched()) {
+        TS_Point touchPoint = cts->getPoint();
+        int x = (tft->width() / grid->getColumns()) * column;
+        int y = (tft->height() / grid->getRows()) * row;
+        int w = (tft->width() / grid->getColumns()) * colspan;
+        int h = (tft->height() / grid->getRows()) * rowspan;
+    
+        int swap = touchPoint.x;
+        touchPoint.x = touchPoint.y;
+        touchPoint.y = swap;
+
+        touchPoint.y = map(touchPoint.y, 240, 0, 0, 240);
+
+        if (touchPoint.x >= x && touchPoint.x <= x + w && touchPoint.y >= y && touchPoint.y <= y + h) {
+          if (!isPressed && !buttonJustPressed && !wasPressed) {
+            setBackgroundColor(activeColor);
+            draw();
+            //onClick();
+            isPressed = true;
+            buttonJustPressed = true;
+            wasPressed = true;
+          }
+        } else {
+          if (isPressed) {
+            setBackgroundColor(inactiveColor);
+            draw();
+          }
+          isPressed = false;
+          buttonJustPressed = false;
+          wasPressed = false;
+        }
+      } else {
+        if (isPressed) {
+          setBackgroundColor(inactiveColor);
+          draw();
+        }
+        isPressed = false;
+        buttonJustPressed = false;
+        wasPressed = false;
+      }
+    }
+
+};
+
+
 class ScrollableLabel : public Label {
   private:
     Adafruit_FT6206* cts;
@@ -316,76 +379,6 @@ class ScrollableLabel : public Label {
         }
       }
     }
-};
-
-class Button : public Label {
-  private:
-    void (*onClick)();
-    Adafruit_FT6206* cts;
-    uint16_t activeColor;
-    uint16_t inactiveColor;
-    int radius;
-
-  public:
-    bool wasPressed = false;
-    bool isPressed;
-    bool buttonJustPressed = false;
-
-
-    static void placeholder() {
-
-    }
-
-    Button(String text, int row, int column, int rowspan, int colspan, uint16_t backgroundColor, uint16_t textColor, uint8_t textSize, bool centered, Adafruit_ILI9341* tft, Grid* grid, int padx, int pady, int border, uint16_t borderColor, int radius, void (*onClick)(), Adafruit_FT6206* cts, uint16_t activeColor)
-      : Label(text, row, column, rowspan, colspan, backgroundColor, textColor, textSize, centered, tft, grid, padx, pady, border, borderColor, radius),
-        onClick(onClick), cts(cts), activeColor(activeColor), inactiveColor(backgroundColor), isPressed(false), radius(radius) {}
-
-
-    void checkTouch() {
-      if (cts->touched()) {
-        TS_Point touchPoint = cts->getPoint();
-        int x = (tft->width() / grid->getColumns()) * column;
-        int y = (tft->height() / grid->getRows()) * row;
-        int w = (tft->width() / grid->getColumns()) * colspan;
-        int h = (tft->height() / grid->getRows()) * rowspan;
-
-        int swap = touchPoint.x;
-        touchPoint.x = touchPoint.y;
-        touchPoint.y = swap;
-
-        touchPoint.y = map(touchPoint.y, 240, 0, 0, 240);
-
-        if (touchPoint.x >= x && touchPoint.x <= x + w && touchPoint.y >= y && touchPoint.y <= y + h) {
-          if (!isPressed && !buttonJustPressed && !wasPressed) {
-            setBackgroundColor(activeColor);
-            draw();
-            //onClick();
-            isPressed = true;
-            buttonJustPressed = true;
-            wasPressed = true;
-          }
-        } else {
-          if (isPressed) {
-            setBackgroundColor(inactiveColor);
-            draw();
-          }
-          isPressed = false;
-          buttonJustPressed = false;
-          wasPressed = false;
-        }
-      } else {
-        if (isPressed) {
-          setBackgroundColor(inactiveColor);
-          draw();
-        }
-        isPressed = false;
-        buttonJustPressed = false;
-        wasPressed = false;
-      }
-    }
-
-
-
 };
 
 class Keyboard {
@@ -546,7 +539,5 @@ class Keyboard {
         }
       }
 };
-
-
 
 #endif
