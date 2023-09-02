@@ -9,535 +9,343 @@
 #include <Adafruit_ImageReader.h> // Image-reading functions
 #include <SdFat.h>
 #include <SPIFFS.h>
+#include <vector>
 
-#define TFT_CHIP_SLCT 32
-#define TFT_DATA_CMD 33
-
-#define baud_rate 9600
-
+/**
+ * Grid class to represent a 2D grid on the display.
+ * Helps in managing and drawing GUI components in a grid format.
+ */
 class Grid {
   private:
     int rows;
     int columns;
-
-    int width;  // width of the grid
-    int height; // height of the grid
-    
-    int gridX;  // x-coordinate of the grid
-    int gridY;  // y-coordinate of the grid
-    
-    Adafruit_ILI9341* tft;
-  
+    int width;     // Width of the entire grid
+    int height;    // Height of the entire grid
+    int gridX;     // Starting X-coordinate of the grid on the display
+    int gridY;     // Starting Y-coordinate of the grid on the display
+     Adafruit_ILI9341* tft; // Pointer to the TFT display object
 
   public:
-    Grid(int rows, int columns, Adafruit_ILI9341* tft, int width, int height, int x = 0, int y = 0) : rows(rows), columns(columns), tft(tft), width(width), height(height), gridX(x), gridY(y) {}
+    /**
+    * Constructor to initialize the grid.
+    * 
+    * @param rows Number of rows in the grid.
+    * @param columns Number of columns in the grid.
+    * @param tft Pointer to the display object.
+    * @param width Width of the grid.
+    * @param height Height of the grid.
+    * @param x (Optional) X-coordinate for the grid's starting point. Defaults to 0.
+    * @param y (Optional) Y-coordinate for the grid's starting point. Defaults to 0.
+    */
+    Grid(int rows, int columns, Adafruit_ILI9341* tft, int width, int height, int x = 0, int y = 0) 
+    : rows(rows), columns(columns), tft(tft), width(width), height(height), gridX(x), gridY(y) {}
 
-    int getRows() {
-      return rows;
-    }
+    // Getters for grid attributes
+    int getRows() const { return rows; }
+    int getColumns() const { return columns; }
+    int getWidth() const { return width; }
+    int getHeight() const { return height; }
+    int getX() const { return gridX; }
+    int getY() const { return gridY; }
 
-    int getColumns() {
-      return columns;
-    }
-
-    int getWidth() {
-      return width;
-    }
-
-    int getHeight() {
-      return height;
-    }
-
-    int getX() {
-      return gridX;
-    }
-
-    int getY() {
-      return gridY;
-    }
-
-    void setRows(int r) {
-      rows = r;
-    }
-
-    void setColumns(int c) {
-      columns = c;
-    }
-
-    void setX(int x) {
-      gridX = x;
-    }
-
-    void setY(int y) {
-      gridY = y;
-    }
-
-
+    // Setters for grid attributes
+    void setRows(int newRows) { rows = newRows; }
+    void setColumns(int newColumns) { columns = newColumns; }
+    void setX(int newX) { gridX = newX; }
+    void setY(int newY) { gridY = newY; }
 };
 
-class Label {
+/**
+ * Widget class represents a graphical widget on a display.
+ * It provides capabilities for drawing GUI elements with text, colors, and positioning,
+ * and can also integrate with a grid system for more structured layout.
+ */
+class Widget {
   protected:
-    String text;
-    int row;
-    int column;
-    int rowspan;
-    int colspan;
-    uint16_t backgroundColor;
-    uint16_t textColor;
-    uint8_t textSize;
-    bool centered;
+    // Positional attributes
+    int x, y;
+    int width, height;
+
+    // Display objects
     Adafruit_ILI9341* tft;
-    Grid* grid;
-    int padx; 
-    int pady; 
-    int border;
-    uint16_t borderColor; 
-    int radius; 
-    bool hidden;
-    int topLine = 0;
-    const GFXfont* customFont;
-    void (*functionPtr)(GFXcanvas16*);
-    int x = -1; // Default to -1 to indicate they are not set
-    int y = -1;
-    GFXcanvas16* canvas;
-      
+    Adafruit_FT6206* ts;
+
+    // Grid management
+    Grid* grid = nullptr;
+    int gridRow;
+    int gridColumn;
+    int columnWidth;
+    int rowHeight;
+
+    // Color attributes
+    uint16_t backgroundColor;
+    uint16_t borderColor;
+    uint16_t textColor;
+
+    // Text attributes
+    int textSize;
+    const GFXfont* font;
+    String text;
+    bool isCentered;
+
+    // Shape attributes
+    int radius;
+    int borderWidth;
+    int topOffset = 0;
+
   public:
-      Label(String text, int row, int column, int rowspan, int colspan, uint16_t backgroundColor, uint16_t textColor, uint8_t textSize, bool centered, Adafruit_ILI9341* tft, Grid* grid, int padx, int pady, int border, uint16_t borderColor, int radius, const GFXfont* font = NULL, void (*functionPtr)(GFXcanvas16*) = nullptr)
-          : text(text), row(row), column(column), rowspan(rowspan), colspan(colspan), backgroundColor(backgroundColor), textColor(textColor), textSize(textSize), centered(centered), tft(tft), grid(grid), padx(padx), pady(pady), border(border), borderColor(borderColor), radius(radius), customFont(font), functionPtr(functionPtr) {}
+    /**
+    * Constructor for the Widget class.
+    * 
+    * @param x Initial x position of the widget.
+    * @param y Initial y position of the widget.
+    * @param width Initial width of the widget.
+    * @param height Initial height of the widget.
+    * @param color Initial color of the widget.
+    * @param touch Pointer to the touch screen interface.
+    * @param display Pointer to the display interface.
+    */
+    Widget(int x, int y, int width, int height, uint16_t color, Adafruit_FT6206* ts, Adafruit_ILI9341* tft)
+    : x(x), y(y), width(width), height(height), tft(tft), ts(ts), backgroundColor(color), borderColor(color), textColor(ILI9341_BLACK) {}
 
-    void draw() {
-        hidden = false;
+    /**
+     * Draws the widget on the display using the current attributes.
+     */
+    virtual void draw() {
+      int widgetWidth, widgetHeight, widgetX, widgetY;
 
-        int drawX = x != -1 ? x : (grid->getX() + (grid->getWidth() / grid->getColumns()) * column);
-        int drawY = y != -1 ? y : (grid->getY() + (grid->getHeight() / grid->getRows()) * row);
-        int w = (grid->getWidth() / grid->getColumns()) * colspan;
-        int h = (grid->getHeight() / grid->getRows()) * rowspan;
-
-        int32_t width, height;
-
-        int16_t x1, y1;
-        uint16_t w1, h1;
-
-        GFXcanvas16 canvas(w, h);
-        
-        if (customFont) {
-          canvas.setFont(customFont);
-        } else {
-          canvas.setFont(NULL);
-        }
-
-        canvas.setTextSize(textSize);
-        canvas.getTextBounds(text, 0, 0, &x1, &y1, &w1, &h1);
-
-        int canvasX = padx + border;
-        int canvasY = pady + border;
-        int canvasW = w - 2 * (padx + border);
-        int canvasH = h - 2 * (pady + border);
-
-        if (centered) {
-          canvasX += (canvasW - w1) / 2;
-          canvasY += (canvasH - h1) / 2 - y1;
-        } else {
-          canvasY = 24;
-        }
-
-        canvas.fillRoundRect(0, 0, w, h, radius, borderColor);
-        canvas.fillRoundRect(border, border, w - 2 * border, h - 2 * border, radius, backgroundColor);
-
-        if (functionPtr != nullptr) {
-          (*functionPtr)(&canvas); // If canvas is the GFXcanvas16* you want to pass to the function
-        }
-
-        canvas.setTextColor(textColor);
-        canvas.setCursor(canvasX, canvasY);
-        canvas.print(text);
-
-        tft->drawRGBBitmap(drawX, drawY, canvas.getBuffer(), w, h);    
-    }
-
-    void hide() {
-      int drawX = x != -1 ? x : (tft->width() / grid->getColumns()) * column;
-      int drawY = y != -1 ? y : (tft->height() / grid->getRows()) * row;
-      int w = (tft->width() / grid->getColumns()) * colspan;
-      int h = (tft->height() / grid->getRows()) * rowspan;
-
-      hidden = true;
-
-      
-
-      // Draw over the area with the background color
-      tft->fillRoundRect(drawX, drawY, w, h, radius, ILI9341_BLACK);
-    }
-
-    void setTopLine(int line) {
-      topLine = line;
-    }
-
-    int getTopLine() {
-      return topLine;
-    }
-
-    void setText(String t) {
-      text = t;
-      draw();
-    }
-
-    String getText() {
-      return text;
-    }
-
-    void setRow(int r) {
-      row = r;
-    }
-
-    int getRow() {
-      return row;
-    }
-
-    void setColumn(int c) {
-      column = c;
-    }
-
-    int getColumn() {
-      return column;
-    }
-
-    void setRowspan(int rs) {
-      rowspan = rs;
-    }
-
-    int getRowspan() {
-      return rowspan;
-    }
-
-    void setColspan(int cs) {
-      colspan = cs;
-    }
-
-    int getColspan() {
-      return colspan;
-    }
-
-    void setBackgroundColor(uint16_t color) {
-      backgroundColor = color;
-    }
-
-    uint16_t getBackgroundColor() {
-      return backgroundColor;
-    }
-
-    bool isHidden() {
-      return hidden;
-    }
-
-    void setPos(int xPos, int yPos) {
-      x = xPos;
-      y = yPos;
-    }
-
-    int getX() {
-        return x;
-    }
-
-    int getY() {
-        return y;
-    }
-
-    int getHeight() {
-      // Compute the height based on grid values if y is not set
-      if(y == -1) {
-        return (grid->getHeight() / grid->getRows()) * rowspan; // Adjusted to use grid height
+      // Determine widget's dimensions based on grid if assigned
+       if (grid) {
+        widgetWidth = grid->getWidth() / grid->getColumns();
+        widgetHeight = grid->getHeight() / grid->getRows();
+        widgetX = grid->getX() + gridColumn * widgetWidth;
+        widgetY = grid->getY() + gridRow * widgetHeight;
+      } else {
+        widgetWidth = width;
+        widgetHeight = height;
+        widgetX = x;
+        widgetY = y;
       }
-      return y; // If y is set, it denotes a custom height
-    }
-        
-    int getWidth() {
-      // Compute the width based on grid values if x is not set
-      if(x == -1) {
-        return (grid->getWidth() / grid->getColumns()) * colspan; // Adjusted to use grid width
+
+      GFXcanvas16 canvas(widgetWidth, widgetHeight);
+
+      // Render background and border
+      canvas.fillRect(widgetX, widgetY, widgetWidth, widgetHeight, borderColor);
+      canvas.fillRect(widgetX + borderWidth, widgetY + borderWidth, widgetWidth - borderWidth * 2, widgetHeight - borderWidth * 2, backgroundColor);
+
+      // Render text
+      canvas.setTextColor(textColor);
+      canvas.setFont(font);
+      canvas.setTextSize(textSize);
+
+      int16_t textX, textY, textWidth, textHeight;
+      canvas.getTextBounds(text, 0, 0, &textX, &textY, &textWidth, &textHeight);
+
+      if (isCentered) {
+        textX = canvas.width() / 2 - textWidth / 2;
+        textY = canvas.height() / 2 - textHeight / 2;
       }
-      return x; // If x is set, it denotes a custom width
+
+      canvas.setCursor(textX, textY - topOffset);
+      canvas.println(text);
+      tft->drawRGBBitmap(widgetX, widgetY, canvas.getBuffer(), widgetWidth, widgetHeight);
     }
 
-
-    void move(int dx, int dy) {
-        x += dx;
-        y += dy;
+    // Grid management functions
+    void assignToGrid(Grid* assignedGrid, int newRow, int newColumn) {
+      grid = assignedGrid;
+      x = y = width = height = -1; // Invalidate the standalone positioning and dimensions
     }
 
+    void removeFromGrid(int newX, int newY, int newWidth, int newHeight) {
+      grid = nullptr;
+      x = newX;
+      y = newY;
+      width = newWidth;
+      height = newHeight;
+    }
+
+    // Setters
+    void setPosition(int newX, int newY) {
+      x = newX;
+      y = newY;
+    }
+
+    void setDimensions(int newWidth, int newHeight, int newRadius, int newBorderWidth) {
+      width = newWidth;
+      height = newHeight;
+      radius = newRadius;
+      borderWidth = newBorderWidth;
+    }
+
+    void setColors(uint16_t newBackgroundColor, uint16_t newBorderColor, uint16_t newTextColor) {
+      backgroundColor = newBackgroundColor;
+      borderColor = newBorderColor;
+      textColor = newTextColor;
+    }
+
+    void setTextAttributes(String newText, int newTextSize, bool newTextIsCentered, int newTopOffset = 0, const GFXfont* newFont = nullptr) {
+      text = newText;
+      textSize = newTextSize;
+      font = newFont;
+      isCentered = newTextIsCentered;
+      topOffset = newTopOffset;
+    }
 };
 
-class Button : public Label {
+/**
+ * Button class represents a clickable button on the display.
+ * It provides capabilities for interaction through touch events,
+ * toggling appearance based on button state, and can execute specific actions when pressed.
+ */
+class Button : public Widget {
   private:
-    void (*onClick)();
-    Adafruit_FT6206* cts;
-    uint16_t activeColor;
-    uint16_t inactiveColor;
+    uint16_t inverseColor = ILI9341_WHITE;  // Color to toggle to when button is pressed
+    bool isPressed = false;  // Track if the button is currently pressed or not
 
   public:
-    bool wasPressed = false;
-    bool isPressed;
-    bool buttonJustPressed = false;
+    /**
+     * Constructor for the Button class.
+     * 
+     * @param x Initial x position of the button.
+     * @param y Initial y position of the button.
+     * @param width Initial width of the button.
+     * @param height Initial height of the button.
+     * @param color Initial color of the button.
+     * @param touchScreen Pointer to the touch screen interface.
+     * @param display Pointer to the display interface.
+     */
+    Button(int x, int y, int width, int height, uint16_t color, Adafruit_FT6206* touchScreen, Adafruit_ILI9341* display)
+      : Widget(x, y, width, height, color, touchScreen, display) {}
 
-    static void placeholder() {}
+    /**
+     * Check if the button has been touched and update its appearance and state.
+     * 
+     * @return true if the button was pressed, false otherwise.
+     */
+    bool checkTouched() {
+      if(touch->touched()) {
+        TS_Point touchPoint = touch->getPoint();
+        int buttonWidth, buttonHeight, buttonX, buttonY;
 
-    Button(String text, int row, int column, int rowspan, int colspan, uint16_t backgroundColor, uint16_t textColor, uint8_t textSize, bool centered, Adafruit_ILI9341* tft, Grid* grid, int padx, int pady, int border, uint16_t borderColor, int radius, void (*onClick)(), Adafruit_FT6206* cts, uint16_t activeColor, const GFXfont* font = NULL, void (*functionPtr)(GFXcanvas16*) = nullptr)
-      : Label(text, row, column, rowspan, colspan, backgroundColor, textColor, textSize, centered, tft, grid, padx, pady, border, borderColor, radius, font, functionPtr), onClick(onClick), cts(cts), activeColor(activeColor), inactiveColor(backgroundColor), isPressed(false) {}
-
-    void checkTouch() {
-      if (cts->touched()) {
-        TS_Point touchPoint = cts->getPoint();
-        int x = (tft->width() / grid->getColumns()) * column;
-        int y = (tft->height() / grid->getRows()) * row;
-        int w = (tft->width() / grid->getColumns()) * colspan;
-        int h = (tft->height() / grid->getRows()) * rowspan;
-    
-        int swap = touchPoint.x;
-        touchPoint.x = touchPoint.y;
-        touchPoint.y = swap;
-
-        touchPoint.y = map(touchPoint.y, 240, 0, 0, 240);
-
-        if (touchPoint.x >= x && touchPoint.x <= x + w && touchPoint.y >= y && touchPoint.y <= y + h) {
-          if (!isPressed && !buttonJustPressed && !wasPressed) {
-            setBackgroundColor(activeColor);
-            draw();
-            //onClick();
-            isPressed = true;
-            buttonJustPressed = true;
-            wasPressed = true;
-          }
+        // Determine button position and dimensions
+        if (grid) {
+          buttonWidth = grid->getWidth() / grid->getColumns();
+          buttonHeight = grid->getHeight() / grid->getRows();
+          buttonX = grid->getX() + gridColumn * buttonWidth;
+          buttonY = grid->getY() + gridRow * buttonHeight;
         } else {
-          if (isPressed) {
-            setBackgroundColor(inactiveColor);
-            draw();
-          }
-          isPressed = false;
-          buttonJustPressed = false;
-          wasPressed = false;
+          buttonWidth = width;
+          buttonHeight = height;
+          buttonX = x;
+          buttonY = y;
         }
-      } else {
-        if (isPressed) {
-          setBackgroundColor(inactiveColor);
+
+        // Swap x and y for correct orientation
+        std::swap(touchPoint.x, touchPoint.y);
+        touchPoint.x = map(touchPoint.x, 320, 0, 0, 320);
+
+        // Check if touch point is within the button boundaries
+        if (touchPoint.x >= buttonX && touchPoint.x <= (buttonX + buttonWidth) &&
+            touchPoint.y >= buttonY && touchPoint.y <= (buttonY + buttonHeight)) {
+          
+          if (!isPressed) {  // If the button was not pressed previously
+            toggleButtonAppearance();
+            isPressed = true;
+            return true;
+          }
+        } else if (isPressed) {  // If touch was released outside the button
+          toggleButtonAppearance();
+          isPressed = false;
+        }
+      } else if (isPressed) {  // Touch was released
+        toggleButtonAppearance();
+        isPressed = false;
+      }
+
+      return false;
+    }
+
+    /**
+     * Set the inverse color of the button.
+     * 
+     * @param newInverseColor Color to set as the inverse.
+     */
+    void setInverseColor(uint16_t newInverseColor) {
+      inverseColor = newInverseColor;
+    }
+
+    /**
+     * Toggle the button's appearance between its normal and inverse colors.
+     */
+    void toggleButtonAppearance() {
+      std::swap(backgroundColor, inverseColor);  // Swap the colors
+      draw();  // Redraw the button
+    }
+};
+
+/**
+ * ScrollableWidget class represents a widget with scrolling content on the display.
+ * It provides capabilities for rendering long content that may not fit within its boundaries
+ * and allows the user to scroll through the content via touch gestures.
+ */
+class ScrollableWidget : public Widget {
+  private:
+    uint16_t inverseColor = ILI9341_WHITE;  // The color when widget is inverse
+    bool isPressed = false;  // To track if the widget is currently pressed or not
+
+  public:
+    /**
+     * Constructor for ScrollableWidget
+     *
+     * @param x The x position of the widget
+     * @param y The y position of the widget
+     * @param width The width of the widget
+     * @param height The height of the widget
+     * @param color The default color of the widget
+     * @param ts Pointer to the touch screen controller
+     * @param tft Pointer to the screen display controller
+     */
+    ScrollableWidget(int x, int y, int width, int height, uint16_t color, Adafruit_FT6206* ts, Adafruit_ILI9341* tft)
+    : Widget(x, y, width, height, color, ts, tft) {}
+
+    /**
+     * Checks if the widget is touched and updates its state accordingly
+     */
+    void checkTouched() {
+      if(ts->touched()) {
+        TS_Point p = ts->getPoint();  // Get the touch point
+
+        int widgetWidth, widgetHeight, widgetX, widgetY;
+
+        // Determine position and size based on grid placement or default position
+        if (grid) {
+          widgetWidth = grid->getWidth() / grid->getColumns();
+          widgetHeight = grid->getHeight() / grid->getRows();
+          widgetX = grid->getX() + collumn * widgetWidth;
+          widgetY = grid->getY() + row * widgetHeight;
+        } else {
+          widgetWidth = width;
+          widgetHeight = height;
+          widgetX = x;
+          widgetY = y;
+        }
+
+        // Adjust touch point for orientation
+        std::swap(p.x, p.y);
+        p.x = map(p.x, 320, 0, 0, 320);
+
+        // Update top offset based on touch point and redraw the widget
+        if(p.y >= 120){
+          topOffset += 5;
+          draw();
+        } else if(p.y <= 120) {
+          topOffset -= 5;
           draw();
         }
-        isPressed = false;
-        buttonJustPressed = false;
-        wasPressed = false;
-      }
-    }
-
-};
-
-
-class ScrollableLabel : public Label {
-  private:
-    Adafruit_FT6206* cts;
-
-  public:
-    ScrollableLabel(String text, int row, int column, int rowspan, int colspan, uint16_t backgroundColor, uint16_t textColor, uint8_t textSize, bool centered, Adafruit_ILI9341* tft, Grid* grid, int padx, int pady, int border, uint16_t borderColor, int radius, Adafruit_FT6206* cts, int topLine)
-      : Label(text, row, column, rowspan, colspan, backgroundColor, textColor, textSize, centered, tft, grid, padx, pady, border, borderColor, radius), cts(cts) {}
-
-    void checkTouch() {
-      if (cts->touched()) {
-        TS_Point touchPoint = cts->getPoint();
-        int x = (tft->width() / grid->getColumns()) * column;
-        int y = (tft->height() / grid->getRows()) * row;
-        int w = (tft->width() / grid->getColumns()) * colspan;
-        int h = (tft->height() / grid->getRows()) * rowspan;
-
-        int swap = touchPoint.x;
-        touchPoint.x = touchPoint.y;
-        touchPoint.y = swap;
-
-        touchPoint.y = map(touchPoint.y, 240, 0, 0, 240);
-
-        if (touchPoint.x >= x && touchPoint.x <= x + w && touchPoint.y >= y && touchPoint.y <= y + h) {
-          // Estimate max characters per line
-          int maxCharsPerLine = w / (6 * textSize);
-
-          // Calculate the maximum lines that can fit in the box
-          int maxLines = h / (8 * textSize);
-
-          // Count lines in text
-          int lineCount = 0;
-          for (int i = 0; i < text.length(); i++) {
-            char c = text[i];
-            if (c == ' ' || c == '\n') {
-              lineCount++;
-            }
-          }
-
-          if (touchPoint.y > (y + h / 2)) {
-            topLine++;
-            draw();
-          }
-          if (touchPoint.y < (y + h / 2) && topLine != 0) {
-            topLine--;
-            draw();
-          }
-        }
       }
     }
 };
 
-class Keyboard {
-    private:
-      Button* keys[5][10];
-      Button* modeKey;
-      Button* deleteKey;
-      Button* spaceKey;
-      Button* enterKey;
-      Adafruit_ILI9341* tft;
-      Grid* grid;
-      Adafruit_FT6206* cts;
-      bool mode;
-      int lineSkip;
-      bool upperCase = true;
-      String numericSpecial[5][10] = {{"1", "2", "3", "4", "5", "6", "7", "8", "9", "0"},
-        {"!", "@", "#", "$", "%", "^", "&", "*", "(", ")"},
-        {"_", "+", "{", "}", "|", "~", "<", ">", "?", ":"},
-        {"MODE", " ", "DEL", "ENT"}
-      };
-
-      String qwerty[5][10] = {{"Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P"},
-        {"A", "S", "D", "F", "G", "H", "J", "K", "L", "-"},
-        {"Z", "X", "C", "V", "B", "N", "M", ",", ".", "/"},
-        {"MODE", " ", "DEL", "ENT"}
-      };
-
-    public:
-      static void placeholder() {
-
-      }
-
-      Keyboard(int skip, Adafruit_ILI9341* tft, Grid* grid, Adafruit_FT6206* cts)
-        : lineSkip(skip), tft(tft), grid(grid), cts(cts) {
-
-        input = "";
-        // Initialize QWERTY keys
-        for (int i = 0; i < 3; i++) {
-          for (int j = 0; j < 10; j++) {
-            keys[i][j] = new Button(qwerty[i][j], i + 1 + lineSkip, j, 1, 1, ILI9341_WHITE, ILI9341_BLACK, 2, true, tft, grid, 2, 2, 1, ILI9341_BLACK, 5, &placeholder, cts, ILI9341_BLUE);
-          }
-        }
-
-        // Initialize bottom row keys
-        modeKey = new Button("mode", 4 + lineSkip, 0, 1, 2, ILI9341_WHITE, ILI9341_BLACK, 2, true, tft, grid, 2, 2, 1, ILI9341_BLACK, 5, &placeholder, cts, ILI9341_BLUE);
-        spaceKey = new Button(" ", 4 + lineSkip, 2, 1, 4, ILI9341_WHITE, ILI9341_BLACK, 2, true, tft, grid, 2, 2, 1, ILI9341_BLACK, 5, &placeholder, cts, ILI9341_BLUE);
-        deleteKey = new Button("Del", 4 + lineSkip, 6, 1, 2, ILI9341_WHITE, ILI9341_BLACK, 2, true, tft, grid, 2, 2, 1, ILI9341_BLACK, 5, &placeholder, cts, ILI9341_BLUE);
-        enterKey = new Button("Enter", 4 + lineSkip, 8, 1, 2, ILI9341_WHITE, ILI9341_BLACK, 2, true, tft, grid, 2, 2, 1, ILI9341_BLACK, 5, &placeholder, cts, ILI9341_BLUE);
-      }
-
-      String input; // Store user input
-
-      void toggleMode() {
-        // Toggle mode between alphanumeric and numeric/special
-        mode = !mode;
-
-        // Update buttons
-        for (int i = 0; i < 3; i++) {
-          for (int j = 0; j < 10; j++) {
-            keys[i][j]->setText(mode ? numericSpecial[i][j] : qwerty[i][j]);
-            keys[i][j]->draw(); // Update the displayed button
-          }
-        }
-        // Redraw the mode button to reflect the current mode
-        modeKey->setText(mode ? "ALPHA" : "MODE");
-        modeKey->draw();
-      }
-
-
-      void draw() {
-        // Draw QWERTY keys
-        for (int i = 0; i < 3; i++) {
-          for (int j = 0; j < 10; j++) {
-            keys[i][j]->draw();
-          }
-        }
-
-        // Draw bottom row keys
-        modeKey->draw();
-        spaceKey->draw();
-        deleteKey->draw();
-        enterKey->draw();
-      }
-
-      bool wasPressed[3][10] = {false};
-      bool wasModeKeyPressed = false;
-      bool wasSpaceKeyPressed = false;
-      bool wasDeleteKeyPressed = false;
-      bool wasEnterKeyPressed = false;
-
-      void readKeys() {
-        for (int i = 0; i < 3; i++) {
-          for (int j = 0; j < 10; j++) {
-            keys[i][j]->checkTouch();
-
-            if (keys[i][j]->getText() == "/" && keys[i][j]->isPressed && !wasPressed[i][j]) {
-              upperCase = !upperCase;
-              // Redraw the keyboard with the new case.
-              for (int m = 0; m < 3; m++) {
-                for (int n = 0; n < 10; n++) {
-                  String keyText = qwerty[m][n];
-                  if (upperCase) {
-                    keyText.toUpperCase();
-                  } else {
-                    keyText.toLowerCase();
-                  }
-                  keys[m][n]->setText(keyText);
-                  keys[m][n]->draw(); // Update the displayed button
-                }
-              }
-            } else if (keys[i][j]->isPressed && !wasPressed[i][j]) {
-              String text = keys[i][j]->getText();
-              input += text;
-              Serial.println(input);
-              wasPressed[i][j] = true;
-            } else if (!keys[i][j]->isPressed) {
-              wasPressed[i][j] = false;
-            }
-          }
-        }
-
-        modeKey->checkTouch();
-        if (modeKey->isPressed && !wasModeKeyPressed) {
-          toggleMode();
-          wasModeKeyPressed = true;
-        } else if (!modeKey->isPressed) {
-          wasModeKeyPressed = false;
-        }
-
-        spaceKey->checkTouch();
-        if (spaceKey->isPressed && !wasSpaceKeyPressed) {
-          input += " ";
-          wasSpaceKeyPressed = true;
-        } else if (!spaceKey->isPressed) {
-          wasSpaceKeyPressed = false;
-        }
-
-        deleteKey->checkTouch();
-        if (deleteKey->isPressed && !wasDeleteKeyPressed) {
-          if (input.length() > 0) {
-            input = input.substring(0, input.length() - 1);
-            Serial.println(input);
-            wasDeleteKeyPressed = true;
-          }
-        } else if (!deleteKey->isPressed) {
-          wasDeleteKeyPressed = false;
-        }
-      }
-
-      bool enterClicked(){
-        enterKey->checkTouch();
-        if (enterKey->isPressed && !wasEnterKeyPressed) {
-          wasEnterKeyPressed = true;
-          return true;
-        } else if (!enterKey->isPressed) {
-          wasEnterKeyPressed = false;
-          return false;
-        }
-      }
-};
 
 #endif
