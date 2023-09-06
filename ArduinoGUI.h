@@ -401,6 +401,9 @@ class Keyboard {
     static const int COLS = 10;
     Button* buttons[ROWS][COLS];
 
+    const int SPACING_X = 2;   // Horizontal spacing between keys
+    const int SPACING_Y = 2;   // Vertical spacing between keys
+
     const char* normalKeys[ROWS][COLS] = {{"Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P"},
                                           {"A", "S", "D", "F", "G", "H", "J", "K", "L", "<"},
                                           {"^", "Z", "X", "C", " ", "V", "B", "N", "M", ">"}};
@@ -440,12 +443,12 @@ class Keyboard {
     String keyboardText;
 
     Keyboard(int x, int y, int width, int height, Adafruit_FT6206* ts, Adafruit_ILI9341* tft) : xPos(x), yPos(y), width(width), height(height), tft(tft), ts(ts) {
-      int buttonWidth = width / COLS;
-      int buttonHeight = height / ROWS;
+      int buttonWidth = (width - SPACING_X * (COLS - 1)) / COLS;
+      int buttonHeight = (height - SPACING_Y * (ROWS - 1)) / ROWS;
 
       for (int i = 0; i < ROWS; i++) {
         for (int j = 0; j < COLS; j++) {
-            buttons[i][j] = new Button(x + j * buttonWidth, y + i * buttonHeight, buttonWidth, buttonHeight, ILI9341_WHITE, ts, tft);
+            buttons[i][j] = new Button(x + j * (buttonWidth + SPACING_X), y + i * (buttonHeight + SPACING_Y), buttonWidth, buttonHeight, ILI9341_WHITE, ts, tft);
             buttons[i][j]->setText(normalKeys[i][j], 2, true);
             buttons[i][j]->addInverseColor(ILI9341_BLACK);
             buttons[i][j]->setDimensions(buttonWidth, buttonHeight, 0, 1);
@@ -462,44 +465,41 @@ class Keyboard {
       }
     }
 
-  void checkTouch() {
-      for (int i = 0; i < ROWS; i++) {
-          for (int j = 0; j < COLS; j++) {
-              if (buttons[i][j]->checkTouched()) {
-                  const char* keyText = normalKeys[i][j];
-                  if (strcmp(keyText, "<") == 0) {
-                      // Delete last character
-                      if (keyboardText.length() > 0) {
-                          keyboardText.remove(keyboardText.length() - 1);
-                      }
-                  } else if (strcmp(keyText, ">") == 0) {
-                      enterPressed = true;
-                  }else if (strcmp(keyText, "^") == 0) {
-                      // Toggle the capitalization state
-                      isUppercase = !isUppercase;
+    void checkTouch() {
+        for (int i = 0; i < ROWS; i++) {
+            for (int j = 0; j < COLS; j++) {
+                if (buttons[i][j]->checkTouched()) {
+                    const char* keyText = normalKeys[i][j];
+                    if (strcmp(keyText, "<") == 0) {
+                        keyboardText = "<"; // Just set keyboardText to "<"
+                    } else if (strcmp(keyText, ">") == 0) {
+                        keyboardText = ">"; // Just set keyboardText to "<"
+                    } else if (strcmp(keyText, "^") == 0) {
+                        // Toggle the capitalization state
+                        isUppercase = !isUppercase;
 
-                      // Update the button texts to reflect the new capitalization state
-                      updateKeyTexts();
+                        // Update the button texts to reflect the new capitalization state
+                        updateKeyTexts();
 
-                      // Redraw the keyboard
-                      draw();
-                  
-                  } else {
-                      // If it's uppercase mode and the key is a letter, capitalize it; else add as it is
-                      if (isUppercase) {
-                        String modifiedKeyText = String(keyText);
-                        modifiedKeyText.toUpperCase();
-                        keyboardText += modifiedKeyText;
-                      } else {
-                        String modifiedKeyText = String(keyText);
-                        modifiedKeyText.toLowerCase();
-                        keyboardText += modifiedKeyText;
-                      }
-                  }
-              }
-          }
-      }
-  }
+                        // Redraw the keyboard
+                        draw();
+                    } else {
+                        // If it's uppercase mode and the key is a letter, capitalize it; else add as it is
+                        if (isUppercase) {
+                            String modifiedKeyText = String(keyText);
+                            modifiedKeyText.toUpperCase();
+                            keyboardText = modifiedKeyText; // Just set keyboardText to the modifiedKeyText
+                        } else {
+                            String modifiedKeyText = String(keyText);
+                            modifiedKeyText.toLowerCase();
+                            keyboardText = modifiedKeyText; // Just set keyboardText to the modifiedKeyText
+                        }
+                    }
+                }
+            }
+        }
+    }
+
 };
 
 #endif
