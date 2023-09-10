@@ -1,10 +1,8 @@
-# ArduinoGUI
-This is a widget based GUI libary for the ILI9341 tft w/ capacitive touchsccreen. 
-I designed this to mimmick GUI libaries like tkinter from python and qt5. 
-Buttonss, labels, and scrollable labels for large texts that clip off the screen are all supported.
-This is a work in progress, so more widgets will be added in the future.
-If you'd like to add to this, feel free.
+# ArduinoGUI for ILI9341 TFT with Capacitive Touchscreen
+ArduinoGUI is a widget-based GUI library tailored for the ILI9341 TFT equipped with a capacitive touchscreen. Inspired by renowned GUI libraries like Python's tkinter and Qt5, this library offers a robust platform to build interactive GUI applications for Arduino environments.
+Features
 
-Some other quality of life features for making interacitve applications such as a keyboard were added.
-
-Link to online wokwi example for a button: https://wokwi.com/projects/365279125549517825
+    Widget-Based Design: Simplifies the creation of UI components such as buttons, labels, and more.
+    Scrollable Labels: Perfect for long texts that might clip off the screen.
+    Rich Widget Collection: From basic buttons to intricate components, ArduinoGUI is continually evolving. As this project is in active development, expect the addition of more widgets in the future.
+    Interactive Applications: The library is not just limited to static widgets. Quality of life features, like an integrated keyboard, have been added to facilitate the creation of interactive applications.
