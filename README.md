@@ -39,12 +39,12 @@ This header file declares the Menu class. The Menu class inherits from the Widge
 
 This header file declares the Style struct. The Style struct contains various properties to style a widget, such as the background color, border color, text color, font size, and padding.
 
-##Widget
+## Widget
 
-###Widget.cpp
+### Widget.cpp
 
 This file contains the implementation of the Widget class. The Widget class has methods to draw the widget, set the position and size of the widget, set the style of the widget, and set the text of the widget.
 
-###Widget.h
+### Widget.h
 
 This header file declares the Widget class. The Widget class has methods to draw the widget, set the position and size of the widget, set the style of the widget, and set the text of the widget.
